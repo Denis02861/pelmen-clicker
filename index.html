@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Пельмень-Кликер 🥟</title>
+<!-- Yandex Games SDK (работает на платформе; локально игра тоже запустится) -->
+<script src="https://yandex.ru/games/sdk/v2"></script>
+<style>
+  :root{
+    --dough:#FFF3DC; --dough-deep:#FFD9A0; --crust:#E8B96A;
+    --ink:#3B2A1E; --ink-soft:#7A6650;
+    --borsch:#C73E3E; --borsch-dark:#A32F2F;
+    --coin:#F5B93F; --buy:#4CAF6D; --buy-dark:#3B8E56;
+    --card:#FFFBF2; --locked:#D8CCB8;
+    --smetana:#FFFFFF;
+    --shadow:0 4px 0 rgba(59,42,30,.18);
+    --r:18px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:'Trebuchet MS','Segoe UI',system-ui,sans-serif;
+    background:radial-gradient(120% 90% at 50% 0%, var(--dough) 0%, var(--dough-deep) 100%);
+    color:var(--ink);
+    display:flex;justify-content:center;
+  }
+  #app{width:100%;max-width:520px;height:100dvh;display:flex;flex-direction:column;position:relative}
+
+  /* ── Шапка ── */
+  header{padding:10px 14px 6px;text-align:center;flex:0 0 auto}
+  .title{font-size:15px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--borsch)}
+  .balance{font-size:38px;font-weight:900;line-height:1.05;margin-top:2px;text-shadow:0 2px 0 rgba(255,255,255,.6)}
+  .balance small{font-size:18px;font-weight:700;color:var(--ink-soft)}
+  .stats{display:flex;justify-content:center;gap:14px;margin-top:4px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .stats .sm{color:var(--borsch)}
+
+  /* ── Зона клика ── */
+  #clickZone{flex:1 1 auto;display:flex;align-items:center;justify-content:center;position:relative;min-height:150px}
+  #pelmen{
+    font-size:130px;line-height:1;cursor:pointer;position:relative;z-index:2;
+    filter:drop-shadow(0 10px 12px rgba(59,42,30,.28));
+    transition:transform .07s ease;
+  }
+  #pelmen.pressed{transform:scale(.88)}
+  .float{
+    position:absolute;font-size:24px;font-weight:900;color:var(--borsch);
+    pointer-events:none;z-index:3;animation:floatUp .9s ease-out forwards;
+    text-shadow:0 2px 0 rgba(255,255,255,.7);
+  }
+  .float.crit{font-size:34px;color:#E08A00}
+  @keyframes floatUp{
+    0%{opacity:1;transform:translateY(0) scale(1)}
+    100%{opacity:0;transform:translateY(-90px) scale(1.25)}
+  }
+  .steam{position:absolute;font-size:22px;opacity:0;pointer-events:none;animation:steamUp 2.6s linear infinite}
+  @keyframes steamUp{
+    0%{opacity:0;transform:translateY(6px)}
+    25%{opacity:.55}
+    100%{opacity:0;transform:translateY(-70px)}
+  }
+  #boostBadge{
+    position:absolute;top:8px;left:50%;transform:translateX(-50%);
+    background:var(--coin);color:var(--ink);font-weight:900;font-size:14px;
+    padding:5px 14px;border-radius:999px;box-shadow:var(--shadow);display:none;z-index:4;
+  }
+
+  /* ── Кнопка буста ── */
+  #boostBtn{
+    position:absolute;right:12px;top:12px;z-index:5;
+    background:var(--coin);border:none;border-radius:14px;
+    font:inherit;font-weight:900;font-size:13px;color:var(--ink);
+    padding:9px 12px;box-shadow:var(--shadow);cursor:pointer;
+  }
+  #boostBtn:disabled{background:var(--locked);color:var(--ink-soft);box-shadow:none}
+  #boostBtn:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 rgba(59,42,30,.18)}
+
+  /* ── Панель вкладок ── */
+  #panel{flex:0 0 auto;background:var(--card);border-radius:26px 26px 0 0;box-shadow:0 -6px 24px rgba(59,42,30,.12);height:44dvh;min-height:280px;display:flex;flex-direction:column}
+  nav{display:flex;gap:4px;padding:8px 8px 4px;flex:0 0 auto}
+  nav button{
+    flex:1;border:none;background:transparent;font:inherit;font-weight:800;font-size:12px;
+    color:var(--ink-soft);padding:8px 2px;border-radius:12px;cursor:pointer;line-height:1.15;
+  }
+  nav button.active{background:var(--borsch);color:#fff}
+  #tabContent{flex:1;overflow-y:auto;padding:6px 10px 16px;-webkit-overflow-scrolling:touch}
+
+  /* ── Карточки ── */
+  .item{
+    display:flex;align-items:center;gap:10px;background:#fff;
+    border:2px solid rgba(59,42,30,.08);border-radius:var(--r);
+    padding:10px;margin-bottom:8px;
+  }
+  .item .em{font-size:34px;flex:0 0 44px;text-align:center}
+  .item .info{flex:1;min-width:0}
+  .item .nm{font-weight:900;font-size:14px}
+  .item .ds{font-size:12px;color:var(--ink-soft);font-weight:600;margin-top:1px}
+  .item .cnt{font-size:12px;font-weight:900;color:var(--borsch)}
+  .btn{
+    border:none;border-radius:14px;font:inherit;font-weight:900;font-size:13px;
+    padding:10px 12px;cursor:pointer;box-shadow:var(--shadow);white-space:nowrap;
+    background:var(--buy);color:#fff;min-width:86px;
+  }
+  .btn:active:not(:disabled){transform:translateY(2px);box-shadow:0 2px 0 rgba(59,42,30,.18)}
+  .btn:disabled{background:var(--locked);color:var(--ink-soft);box-shadow:none;cursor:default}
+  .btn.owned{background:var(--coin);color:var(--ink)}
+  .btn.red{background:var(--borsch)}
+  .locked-item{opacity:.55;filter:grayscale(.4)}
+
+  .ach{opacity:.45}
+  .ach.done{opacity:1}
+  .ach .em{filter:grayscale(1)}
+  .ach.done .em{filter:none}
+
+  /* ── Престиж ── */
+  .prestige-box{background:#fff;border-radius:var(--r);padding:16px;text-align:center;border:2px solid rgba(59,42,30,.08)}
+  .prestige-box h3{font-size:16px;margin-bottom:6px}
+  .prestige-box p{font-size:13px;color:var(--ink-soft);font-weight:600;margin-bottom:10px;line-height:1.4}
+
+  /* ── Тосты и попапы ── */
+  #toast{
+    position:absolute;bottom:calc(44dvh + 12px);left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;font-weight:800;font-size:13px;
+    padding:10px 18px;border-radius:999px;opacity:0;transition:.3s;z-index:20;
+    max-width:90%;text-align:center;pointer-events:none;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #overlay{
+    position:absolute;inset:0;background:rgba(59,42,30,.45);z-index:30;
+    display:none;align-items:center;justify-content:center;padding:24px;
+  }
+  #overlay.show{display:flex}
+  .popup{background:var(--card);border-radius:22px;padding:22px;text-align:center;max-width:340px;width:100%}
+  .popup .big{font-size:52px}
+  .popup h3{margin:8px 0 6px;font-size:18px}
+  .popup p{font-size:14px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="title">🥟 Пельмень-Кликер</div>
+    <div class="balance"><span id="balance">0</span> <small>пельменей</small></div>
+    <div class="stats">
+      <span id="perSec">0 / сек</span>
+      <span id="perClick">+1 за клик</span>
+      <span class="sm" id="smetanaStat" style="display:none">🥛 0</span>
+    </div>
+  </header>
+
+  <div id="clickZone">
+    <button id="boostBtn">⚡ Буст ×2</button>
+    <div id="boostBadge">⚡ ×2 доход!</div>
+    <div class="steam" style="left:42%;top:30%">💨</div>
+    <div class="steam" style="left:55%;top:26%;animation-delay:1.2s">💨</div>
+    <div id="pelmen">🥟</div>
+  </div>
+
+  <div id="panel">
+    <nav>
+      <button data-tab="shop" class="active">🏪 Магазин</button>
+      <button data-tab="upgrades">⬆️ Улучшения</button>
+      <button data-tab="skins">🎨 Скины</button>
+      <button data-tab="ach">🏆 Награды</button>
+      <button data-tab="prestige">🥛 Престиж</button>
+    </nav>
+    <div id="tabContent"></div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="overlay"><div class="popup" id="popupBody"></div></div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   ПЕЛЬМЕНЬ-КЛИКЕР — оригинальная idle-игра для Яндекс Игр
+   Один файл. Сохранения: Yandex SDK → localStorage → память.
+   ============================================================ */
+
+// ───────── Данные контента ─────────
+const BUILDINGS = [
+  {id:'bab',  em:'👵', nm:'Бабушка Зина',            ds:'Лепит с любовью',            cost:15,       inc:0.5},
+  {id:'cat',  em:'🐱', nm:'Кот-помощник',            ds:'Следит, чтобы не пригорело', cost:100,      inc:2},
+  {id:'stol', em:'🍽️', nm:'Столовая №1',             ds:'Комплексный обед',           cost:700,      inc:9},
+  {id:'lark', em:'🏪', nm:'Пельменная у дома',       ds:'Очередь с утра',             cost:4000,     inc:38},
+  {id:'truck',em:'🚚', nm:'Пельмень-фудтрак',        ds:'Гастроли по городу',         cost:22000,    inc:150},
+  {id:'fab',  em:'🏭', nm:'Фабрика пельменей',       ds:'Тонны теста в час',          cost:130000,   inc:640},
+  {id:'corp', em:'🏢', nm:'Пельмень-корпорация',     ds:'Акции растут как тесто',     cost:900000,   inc:3100},
+  {id:'rocket',em:'🚀',nm:'Космопельменная',         ds:'Доставка на орбиту',         cost:7000000,  inc:16000},
+  {id:'portal',em:'🌀',nm:'Портал в Пельменную вселенную', ds:'Там всё из теста',     cost:60000000, inc:95000},
+];
+const UPGRADES = [
+  {id:'u1', em:'🥄', nm:'Деревянная ложка',   ds:'Клик ×2',            cost:100,       mult:2},
+  {id:'u2', em:'🧂', nm:'Секретная приправа', ds:'Клик ×2',            cost:1500,      mult:2},
+  {id:'u3', em:'🍲', nm:'Бульон бабушки',     ds:'Клик ×2',            cost:20000,     mult:2},
+  {id:'u4', em:'🥢', nm:'Золотые палочки',    ds:'Клик ×3',            cost:250000,    mult:3},
+  {id:'u5', em:'👨‍🍳', nm:'Шеф-повар Игорь',  ds:'Клик ×3',            cost:3000000,   mult:3},
+  {id:'u6', em:'🔥', nm:'Вечная плита',       ds:'Клик ×4',            cost:40000000,  mult:4},
+  {id:'u7', em:'🌟', nm:'Звезда Мишлен',      ds:'Клик ×5',            cost:500000000, mult:5},
+];
+const SKINS = [
+  {id:'s0', em:'🥟', nm:'Классика',        cost:0,        bonus:0},
+  {id:'s1', em:'🍕', nm:'Пицца-пельмень',  cost:10000,    bonus:5},
+  {id:'s2', em:'🍔', nm:'Бургер-пельмень', cost:75000,    bonus:10},
+  {id:'s3', em:'🍩', nm:'Сладкий пончик',  cost:400000,   bonus:15},
+  {id:'s4', em:'🍉', nm:'Арбуз-гигант',    cost:2500000,  bonus:20},
+  {id:'s5', em:'🤖', nm:'Кибер-пельмень',  cost:20000000, bonus:30},
+  {id:'s6', em:'💎', nm:'Алмазный',        cost:200000000,bonus:50},
+];
+const ACHIEVEMENTS = [
+  {id:'a1', em:'👆', nm:'Первый клик',        ds:'Кликни 1 раз',              test:s=>s.clicks>=1},
+  {id:'a2', em:'💪', nm:'Разминка пальцев',   ds:'100 кликов',                test:s=>s.clicks>=100},
+  {id:'a3', em:'⚡', nm:'Пулемётчик',         ds:'2 500 кликов',              test:s=>s.clicks>=2500},
+  {id:'a4', em:'🔥', nm:'Легенда клика',      ds:'25 000 кликов',             test:s=>s.clicks>=25000},
+  {id:'a5', em:'🥟', nm:'Первая тысяча',      ds:'Заработай 1 000',           test:s=>s.total>=1e3},
+  {id:'a6', em:'💰', nm:'Пельмень-миллионер', ds:'Заработай 1 млн',           test:s=>s.total>=1e6},
+  {id:'a7', em:'🏦', nm:'Олигарх теста',      ds:'Заработай 1 млрд',          test:s=>s.total>=1e9},
+  {id:'a8', em:'👵', nm:'Бригада бабушек',    ds:'10 бабушек Зин',            test:s=>(s.b.bab||0)>=10},
+  {id:'a9', em:'🏭', nm:'Индустриализация',   ds:'Купи фабрику',              test:s=>(s.b.fab||0)>=1},
+  {id:'a10',em:'🌀', nm:'За гранью',          ds:'Открой портал',             test:s=>(s.b.portal||0)>=1},
+  {id:'a11',em:'🎨', nm:'Модник',             ds:'Купи 3 скина',              test:s=>s.skins.length>=3},
+  {id:'a12',em:'🥛', nm:'Со сметаной вкуснее',ds:'Сделай первый престиж',     test:s=>s.smetana>=1},
+];
+
+// ───────── Состояние ─────────
+const state = {
+  p:0, total:0, clicks:0,
+  b:{}, ups:[], skins:['s0'], skin:'s0',
+  smetana:0, ach:[],
+  boostUntil:0, boostReadyAt:0,
+  last:Date.now(),
+};
+
+let ysdk = null, playerObj = null, memSave = null, dirty = false;
+
+// ───────── Форматирование чисел ─────────
+const SUFF = ['','тыс','млн','млрд','трлн','квадр','квинт'];
+function fmt(n){
+  if(n < 1000) return String(Math.floor(n));
+  let i = 0;
+  while(n >= 1000 && i < SUFF.length-1){ n/=1000; i++; }
+  return (n>=100?Math.floor(n):n.toFixed(1).replace(/\.0$/,'')) + ' ' + SUFF[i];
+}
+
+// ───────── Экономика ─────────
+const bCost = b => Math.ceil(b.cost * Math.pow(1.15, state.b[b.id]||0));
+function skinBonus(){ const s = SKINS.find(x=>x.id===state.skin); return s ? s.bonus/100 : 0; }
+function globalMult(){
+  let m = 1 + state.smetana*0.02;
+  if(Date.now() < state.boostUntil) m *= 2;
+  return m;
+}
+function clickPower(){
+  let base = 1;
+  for(const u of UPGRADES) if(state.ups.includes(u.id)) base *= u.mult;
+  return base * (1+skinBonus()) * globalMult();
+}
+function perSec(){
+  let s = 0;
+  for(const b of BUILDINGS) s += (state.b[b.id]||0) * b.inc;
+  return s * globalMult();
+}
+function smetanaGain(){ return Math.floor(Math.sqrt(state.total/1e6)); }
+
+// ───────── DOM ─────────
+const $ = id => document.getElementById(id);
+const elBal=$('balance'), elSec=$('perSec'), elClk=$('perClick'),
+      elSm=$('smetanaStat'), elPelmen=$('pelmen'), elZone=$('clickZone'),
+      elTab=$('tabContent'), elToast=$('toast'), elOverlay=$('overlay'),
+      elPopup=$('popupBody'), elBoostBtn=$('boostBtn'), elBoostBadge=$('boostBadge');
+let activeTab = 'shop';
+
+function earn(n){ state.p += n; state.total += n; }
+
+function updateHeader(){
+  elBal.textContent = fmt(state.p);
+  elSec.textContent = fmt(perSec()) + ' / сек';
+  elClk.textContent = '+' + fmt(clickPower()) + ' за клик';
+  if(state.smetana > 0){ elSm.style.display=''; elSm.textContent = '🥛 ' + state.smetana; }
+  const boosted = Date.now() < state.boostUntil;
+  elBoostBadge.style.display = boosted ? 'block' : 'none';
+  if(boosted){
+    elBoostBtn.disabled = true;
+    elBoostBtn.textContent = '⚡ ' + Math.ceil((state.boostUntil-Date.now())/1000) + ' c';
+  } else if(Date.now() < state.boostReadyAt){
+    elBoostBtn.disabled = true;
+    elBoostBtn.textContent = '⏳ ' + Math.ceil((state.boostReadyAt-Date.now())/1000) + ' c';
+  } else {
+    elBoostBtn.disabled = false;
+    elBoostBtn.textContent = '⚡ Буст ×2';
+  }
+}
+
+// ───────── Клик ─────────
+function doClick(x, y){
+  const crit = Math.random() < 0.05;
+  const gain = clickPower() * (crit ? 5 : 1);
+  earn(gain);
+  state.clicks++;
+  dirty = true;
+  const f = document.createElement('div');
+  f.className = 'float' + (crit ? ' crit' : '');
+  f.textContent = (crit?'💥 ':'') + '+' + fmt(gain);
+  const r = elZone.getBoundingClientRect();
+  f.style.left = (x - r.left - 20 + (Math.random()*30-15)) + 'px';
+  f.style.top  = (y - r.top - 30) + 'px';
+  elZone.appendChild(f);
+  setTimeout(()=>f.remove(), 900);
+  elPelmen.classList.add('pressed');
+  setTimeout(()=>elPelmen.classList.remove('pressed'), 70);
+  updateHeader();
+  checkAch();
+}
+elPelmen.addEventListener('pointerdown', e => doClick(e.clientX, e.clientY));
+
+// ───────── Буст (заглушка под rewarded-рекламу) ─────────
+elBoostBtn.addEventListener('click', () => {
+  const start = () => {
+    state.boostUntil = Date.now() + 60000;
+    state.boostReadyAt = Date.now() + 60000 + 180000; // кулдаун 3 мин после буста
+    toast('⚡ Доход ×2 на 60 секунд!');
+    dirty = true; updateHeader(); renderTab();
+  };
+  if(ysdk && ysdk.adv && ysdk.adv.showRewardedVideo){
+    ysdk.adv.showRewardedVideo({callbacks:{
+      onRewarded: start,
+      onError: start, // не наказываем игрока, если реклама не загрузилась
+    }});
+  } else start();
+});
+
+// ───────── Вкладки ─────────
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab = btn.dataset.tab;
+    renderTab();
+  });
+});
+
+function itemHTML({em, nm, ds, cnt, btn, locked}){
+  return `<div class="item ${locked?'locked-item':''}">
+    <div class="em">${em}</div>
+    <div class="info"><div class="nm">${nm} ${cnt!==undefined?`<span class="cnt">×${cnt}</span>`:''}</div><div class="ds">${ds}</div></div>
+    ${btn||''}
+  </div>`;
+}
+
+function renderTab(){
+  let html = '';
+  if(activeTab === 'shop'){
+    let prevOwned = true;
+    for(const b of BUILDINGS){
+      const cnt = state.b[b.id]||0;
+      const visible = prevOwned || cnt > 0 || state.total >= b.cost*0.5;
+      prevOwned = cnt > 0;
+      if(!visible){ html += itemHTML({em:'❓', nm:'???', ds:'Продолжай зарабатывать…', locked:true}); break; }
+      const cost = bCost(b);
+      html += itemHTML({
+        em:b.em, nm:b.nm, cnt,
+        ds:`${b.ds} · +${fmt(b.inc)}/сек`,
+        btn:`<button class="btn" data-buy="${b.id}" ${state.p<cost?'disabled':''}>🥟 ${fmt(cost)}</button>`
+      });
+    }
+  }
+  if(activeTab === 'upgrades'){
+    for(const u of UPGRADES){
+      const owned = state.ups.includes(u.id);
+      html += itemHTML({
+        em:u.em, nm:u.nm, ds:u.ds,
+        btn: owned ? `<button class="btn owned" disabled>✓ Куплено</button>`
+                   : `<button class="btn" data-up="${u.id}" ${state.p<u.cost?'disabled':''}>🥟 ${fmt(u.cost)}</button>`
+      });
+    }
+  }
+  if(activeTab === 'skins'){
+    for(const s of SKINS){
+      const owned = state.skins.includes(s.id);
+      const active = state.skin === s.id;
+      let btn;
+      if(active) btn = `<button class="btn owned" disabled>✓ Надет</button>`;
+      else if(owned) btn = `<button class="btn" data-wear="${s.id}">Надеть</button>`;
+      else btn = `<button class="btn" data-skin="${s.id}" ${state.p<s.cost?'disabled':''}>🥟 ${fmt(s.cost)}</button>`;
+      html += itemHTML({em:s.em, nm:s.nm, ds: s.bonus?`+${s.bonus}% к клику`:'Тот самый', btn});
+    }
+  }
+  if(activeTab === 'ach'){
+    for(const a of ACHIEVEMENTS){
+      const done = state.ach.includes(a.id);
+      html += `<div class="item ach ${done?'done':''}">
+        <div class="em">${a.em}</div>
+        <div class="info"><div class="nm">${a.nm}</div><div class="ds">${a.ds}</div></div>
+        <div style="font-size:20px">${done?'✅':'🔒'}</div>
+      </div>`;
+    }
+  }
+  if(activeTab === 'prestige'){
+    const gain = smetanaGain();
+    html = `<div class="prestige-box">
+      <div style="font-size:44px">🥛</div>
+      <h3>Сметана престижа</h3>
+      <p>Начни лепить заново и получи <b>сметану</b>.<br>
+      Каждая банка даёт <b>+2% ко всему доходу навсегда</b>.<br><br>
+      Сейчас у тебя: <b>🥛 ${state.smetana}</b><br>
+      За сброс получишь: <b>🥛 ${gain}</b></p>
+      <button class="btn red" id="prestigeBtn" ${gain<1?'disabled':''}>
+        ${gain<1 ? 'Заработай 1 млн всего' : 'Сбросить и получить 🥛 '+gain}
+      </button>
+    </div>`;
+  }
+  elTab.innerHTML = html;
+
+  elTab.querySelectorAll('[data-buy]').forEach(el=>el.addEventListener('click',()=>{
+    const b = BUILDINGS.find(x=>x.id===el.dataset.buy); const cost = bCost(b);
+    if(state.p >= cost){ state.p -= cost; state.b[b.id]=(state.b[b.id]||0)+1; dirty=true; renderTab(); updateHeader(); checkAch(); }
+  }));
+  elTab.querySelectorAll('[data-up]').forEach(el=>el.addEventListener('click',()=>{
+    const u = UPGRADES.find(x=>x.id===el.dataset.up);
+    if(state.p >= u.cost && !state.ups.includes(u.id)){
+      state.p -= u.cost; state.ups.push(u.id); dirty=true;
+      toast(`${u.em} ${u.nm}: сила клика выросла!`); renderTab(); updateHeader();
+    }
+  }));
+  elTab.querySelectorAll('[data-skin]').forEach(el=>el.addEventListener('click',()=>{
+    const s = SKINS.find(x=>x.id===el.dataset.skin);
+    if(state.p >= s.cost && !state.skins.includes(s.id)){
+      state.p -= s.cost; state.skins.push(s.id); state.skin = s.id;
+      elPelmen.textContent = s.em; dirty=true;
+      toast(`${s.em} Новый скин: ${s.nm}!`); renderTab(); updateHeader(); checkAch();
+    }
+  }));
+  elTab.querySelectorAll('[data-wear]').forEach(el=>el.addEventListener('click',()=>{
+    state.skin = el.dataset.wear;
+    elPelmen.textContent = SKINS.find(x=>x.id===state.skin).em;
+    dirty=true; renderTab(); updateHeader();
+  }));
+  const pb = $('prestigeBtn');
+  if(pb) pb.addEventListener('click', doPrestige);
+}
+
+function doPrestige(){
+  const gain = smetanaGain();
+  if(gain < 1) return;
+  showPopup('🥛', 'Престиж!', `Ты получил ${gain} банок сметаны.<br>Теперь весь доход больше на +${(state.smetana+gain)*2}%!`, 'Лепить заново');
+  state.smetana += gain;
+  state.p = 0; state.total = 0; state.b = {}; state.ups = [];
+  state.boostUntil = 0;
+  dirty = true;
+  checkAch(); renderTab(); updateHeader();
+  saveGame();
+  if(ysdk && ysdk.adv && ysdk.adv.showFullscreenAdv) ysdk.adv.showFullscreenAdv({});
+}
+
+// ───────── Достижения ─────────
+function checkAch(){
+  for(const a of ACHIEVEMENTS){
+    if(!state.ach.includes(a.id) && a.test(state)){
+      state.ach.push(a.id); dirty = true;
+      toast(`🏆 Достижение: ${a.nm}!`);
+    }
+  }
+}
+
+// ───────── UI-хелперы ─────────
+let toastT;
+function toast(msg){
+  elToast.textContent = msg;
+  elToast.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>elToast.classList.remove('show'), 2200);
+}
+function showPopup(em, title, body, btnText){
+  elPopup.innerHTML = `<div class="big">${em}</div><h3>${title}</h3><p>${body}</p>
+    <button class="btn" style="width:100%">${btnText}</button>`;
+  elPopup.querySelector('button').addEventListener('click', ()=>elOverlay.classList.remove('show'));
+  elOverlay.classList.add('show');
+}
+
+// ───────── Сохранения ─────────
+function snapshot(){
+  return {
+    p:state.p, total:state.total, clicks:state.clicks,
+    b:state.b, ups:state.ups, skins:state.skins, skin:state.skin,
+    smetana:state.smetana, ach:state.ach, last:Date.now(), v:1
+  };
+}
+function applySave(d){
+  if(!d) return;
+  Object.assign(state, {
+    p:d.p||0, total:d.total||0, clicks:d.clicks||0,
+    b:d.b||{}, ups:d.ups||[], skins:d.skins&&d.skins.length?d.skins:['s0'],
+    skin:d.skin||'s0', smetana:d.smetana||0, ach:d.ach||[], last:d.last||Date.now()
+  });
+}
+function saveGame(){
+  const d = snapshot();
+  memSave = d;
+  try{ localStorage.setItem('pelmen_save', JSON.stringify(d)); }catch(e){}
+  if(playerObj && playerObj.setData){ try{ playerObj.setData({save:d}); }catch(e){} }
+  dirty = false;
+}
+async function loadGame(){
+  let d = null;
+  if(playerObj && playerObj.getData){
+    try{ const r = await playerObj.getData(['save']); if(r && r.save) d = r.save; }catch(e){}
+  }
+  if(!d){ try{ const r = localStorage.getItem('pelmen_save'); if(r) d = JSON.parse(r); }catch(e){} }
+  if(!d) d = memSave;
+  applySave(d);
+}
+
+// ───────── Оффлайн-доход ─────────
+function offlineEarnings(){
+  const away = Math.min((Date.now() - state.last)/1000, 8*3600); // максимум 8 часов
+  if(away > 60 && perSec() > 0){
+    const gain = perSec() * away * 0.5;
+    earn(gain);
+    showPopup('😴', 'С возвращением!',
+      `Пока тебя не было, бабушки налепили<br><b>🥟 ${fmt(gain)}</b> пельменей!`, 'Забрать');
+  }
+}
+
+// ───────── Игровой цикл ─────────
+setInterval(()=>{
+  const inc = perSec()/10;
+  if(inc > 0){ earn(inc); dirty = true; }
+  updateHeader();
+}, 100);
+setInterval(()=>{ checkAch(); if(activeTab==='shop'||activeTab==='prestige') renderTab(); }, 1000);
+setInterval(()=>{ if(dirty) saveGame(); }, 15000);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) saveGame(); });
+
+// ───────── Старт ─────────
+(async function init(){
+  try{
+    if(typeof YaGames !== 'undefined'){
+      ysdk = await YaGames.init();
+      try{ playerObj = await ysdk.getPlayer(); }catch(e){}
+    }
+  }catch(e){ /* локальный запуск — играем без SDK */ }
+  await loadGame();
+  elPelmen.textContent = (SKINS.find(x=>x.id===state.skin)||SKINS[0]).em;
+  offlineEarnings();
+  updateHeader();
+  renderTab();
+  if(ysdk && ysdk.features && ysdk.features.LoadingAPI) ysdk.features.LoadingAPI.ready();
+})();
+</script>
+</body>
+</html>
