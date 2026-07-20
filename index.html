@@ -537,6 +537,10 @@ document.addEventListener('visibilitychange', ()=>{ if(document.hidden) saveGame
   try{
     if(typeof YaGames !== 'undefined'){
       ysdk = await YaGames.init();
+      try {
+        const lang = ysdk.environment?.i18n?.lang || 'ru';
+        window.__gameLang = lang; // req 2.14: language auto-detection via SDK
+      } catch(e) { window.__gameLang = 'ru'; }
       try{ playerObj = await ysdk.getPlayer(); }catch(e){}
     }
   }catch(e){ /* локальный запуск — играем без SDK */ }
